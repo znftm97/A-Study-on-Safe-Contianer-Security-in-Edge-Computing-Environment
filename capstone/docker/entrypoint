@@ -1,0 +1,29 @@
+#!/bin/sh
+set -e
+
+echo "-------------------------"
+echo "- Anchore compose pull  -"
+echo "-------------------------"
+docker-compose -f /root/anchore/docker-compose.yaml pull
+
+echo "-----------------------"
+echo "- Anchore compose up  -"
+echo "-----------------------"
+nohup docker-compose -f /root/anchore/docker-compose.yaml up </dev/null &>/dev/null &
+
+/bin/sh
+# nohup docker-compose -f /root/anchore/docker-compose.yaml up </dev/null &>/dev/null &
+
+# while true; do
+#         if [ 5 -eq "$(anchore-cli --url http://$gw:8228/v1 --u admin --p foobar system status | grep -w up | wc -l)" ]; then
+#                 echo "--------"
+#                 echo "- DONE -"
+#                 echo "--------"
+#                 break
+#         fi
+#         echo "- docker-compose up 중... (1초마다 갱신)"
+#         sleep 1 #1초
+# done
+#
+
+# exit 0

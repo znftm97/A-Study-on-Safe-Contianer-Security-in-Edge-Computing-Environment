@@ -1,0 +1,45 @@
+FROM alpine:3.12.0
+LABEL MAINTAINER abysswhale <abysswhale@gmail.com>
+
+RUN apk --update add --no-cache curl vim openrc shadow \
+    && curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/master/contrib/install.sh | sh -s -- -b /usr/local/bin
+# line 4(curl), 5로 trivy 이식 끝
+
+# docker-compose.yaml 다운로드
+RUN mkdir /root/anchore
+COPY ./docker-compose.yaml /root/anchore/docker-compose.yaml
+
+# DinD 사용을 위한 패키지 다운로드
+RUN apk update \
+    && apk add --no-cache docker-cli python3 py3-pip \
+    && apk add --no-cache --virtual .docker-compose-deps python3-dev libffi-dev openssl-dev gcc libc-dev make \
+    && pip3 install docker-compose \
+    && apk del .docker-compose-deps
+
+# Anchore-cli 설치
+RUN mkdir -p /root/anchore/anchore-cli
+RUN apk add --no-cache git \
+    && git clone https://github.com/anchore/anchore-cli /root/anchore/anchore-cli
+RUN pip3 install --user --upgrade /root/anchore/anchore-cli/ \
+    && cp /root/.local/bin/anchore-cli /usr/sbin \
+    && rm -rf /root/anchore/anchore-cli \
+    && apk del git
+
+# Clean apt list
+RUN rm -rf /var/lib/apt/lists/*
+
+# env test
+ENV ENV="/etc/profile"
+RUN echo "alias anchore-cli=\"anchore-cli --url http://\$gw:8228/v1 --u admin --p foobar\"" > "$ENV"
+
+# NTP
+RUN apk add --no-cache tzdata
+RUN cp /usr/share/zoneinfo/Asia/Seoul /etc/localtime
+
+# 컨테이너 초기 실행 지정
+RUN mkdir -p /root/result
+WORKDIR /root/
+COPY ./vuln /bin/
+COPY ./entrypoint /bin/
+RUN chmod u+x,g+x /bin/entrypoint /bin/vuln
+ENTRYPOINT [ "entrypoint" ]

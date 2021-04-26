@@ -1,0 +1,59 @@
+#!/bin/sh
+
+quit() {
+	echo -e "\n---종료합니다---"
+	docker-compose -f /root/anchore/docker-compose.yaml down
+	/bin/sh
+}
+
+env_anchore="anchore-cli --url http://$gw:8228/v1 --u admin --p foobar"
+echo "---------------------------"
+echo "- 2020 Capstone Vulncheck -"
+echo -e "---------------------------\n"
+
+echo "[양식] docker.io/이미지명"
+read -p "- 이미지 주소를 입력해주세요: " image_docker
+image_name=${image_docker#docker.io/}
+
+if [ $image_docker==docker.io* ]; then
+	echo -e "\n---$image_name에 대한 진단을 시작합니다---"
+else
+	echo -e "\n---docker.io 이미지 외엔 지원하지 않습니다---"
+	quit
+fi
+
+now_date=$(date +%Y%m%d)
+now_time=$(date +%H%M)
+
+echo -e "\n- ANCHORE"
+$env_anchore image add $image_docker
+
+if [ $? -eq 0 ]; then
+	echo -e "- [Anchore] 이미지 불러오기 완료---\n"
+	echo -e "- [Anchore] 이미지 진단을 진단을 시작합니다\n"
+else
+	echo "- [Anchore] 이미지 불러오기 실패, 상태를 확인해주세요---"
+	quit
+fi
+
+$env_anchore image wait $image_docker
+$env_anchore --json image vuln $image_docker all >/root/result/$image_name"_ANCHORE_"$now_date"_"$now_time".json"
+echo "- ANCHORE 진단 완료"
+
+echo -e "\n- TRIVY"
+trivy -f json -o /root/result/$image_name"_TRIVY_"$now_date"_"$now_time".json" $image_docker
+
+if [ $? -eq 0 ]; then
+	echo -e "- [Trivy] 이미지 불러오기 완료---"
+else
+	echo "- [Trivy] 이미지 불러오기 실패, Trivy 혹은 Docker 실행 여부를 확인해주세요---"
+	quit
+fi
+
+echo -e "\n- TRIVY 진단 완료---"
+
+echo -e "\n- 진단 결과 저장 완료---"
+echo "- "$image_name"_ANCHORE_"$now_date"_"$now_time".json"
+echo "- "$image_name"_TRIVY_"$now_date"_"$now_time".json"
+
+quit
